@@ -105,3 +105,9 @@ venv.bak/
 
 
 data/
+
+
+*.csv
+*.tar.gz
+*.hdf5
+*.h5
