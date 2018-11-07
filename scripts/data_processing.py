@@ -78,8 +78,8 @@ if __name__ == '__main__':
     # for p in jobs:
     #     p.join()
 
-    pool = multiprocessing.Pool(processes = 2)
-    for name in 'ABCD':
+    pool = multiprocessing.Pool(processes = 8)
+    for name in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
         pool.apply_async(naive_get_all_features_from_gzip, (basedir, name, ))
     pool.close()
     pool.join()
