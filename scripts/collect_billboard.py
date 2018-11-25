@@ -2,7 +2,11 @@ import billboard
 import pandas as pd
 import os, codecs
 
-CHART_NAMES = ['youtube']
+# hot-100: most 100 hot songs
+# youtube: most popular songs on youtube
+CHART_NAMES = ['youtube', 'top-album-sales', 'catalog-albums', 
+                'pop-songs', 'digital-song-sales', 'radio-songs',
+                'streaming-songs']
 
 
 def init_chart_dict(chart_name):
@@ -18,6 +22,17 @@ def init_chart_dict(chart_name):
         b_chart_d['is_new'] = []
         return b_chart_d
     elif chart_name == 'youtube':
+        b_chart_d = {}
+        b_chart_d['title'] = []
+        b_chart_d['chart_date'] = []
+        b_chart_d['artist_name'] = []
+        b_chart_d['peak_rank'] = []
+        b_chart_d['last_rank'] = []
+        b_chart_d['on_chart_weeks'] = []
+        b_chart_d['current_rank'] = []
+        b_chart_d['is_new'] = []
+        return b_chart_d
+    else:
         b_chart_d = {}
         b_chart_d['title'] = []
         b_chart_d['chart_date'] = []
@@ -44,7 +59,7 @@ def store_chart(chart):
 def store_checkpoint(chart, d, chart_name):
     file_name = '..\\data\\raw\\{}.csv'.format(chart_name)
     df = pd.DataFrame.from_dict(d)
-    print ("####### Storing checkpoint {} #######".format(chart.date))
+    print ("####### Storing {} checkpoint {} #######".format(chart_name, chart.date))
     if os.path.exists(file_name):
         df.to_csv(file_name, mode='a', header=False, index=False)
     else:
@@ -68,7 +83,7 @@ for chart_name in CHART_NAMES:
     b_chart_d = init_chart_dict(chart_name)
     count = 0
     while chart.previousDate:
-        print ('Processing Chart from {}'.format(chart.date))
+        print ('Processing Chart {} from {}'.format(chart_name, chart.date))
         store_chart(chart)
         count += 1
         if count % 52 == 0:
