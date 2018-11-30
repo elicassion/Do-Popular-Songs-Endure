@@ -1,4 +1,6 @@
-import os
+import os, time
+
+import multiprocessing
 
 import google.oauth2.credentials
 
@@ -128,6 +130,67 @@ def make_data_dict(counter, last_counter,
   }
   return d
 
+def naive_get_youtube_count(client, titles, artists):
+  try:
+    view_ct = []
+    like_ct = []
+    dislike_ct = []
+    comment_ct = []
+    for t, a in zip(titles, artists):
+      sres = search_list_by_keyword(client,
+        part='snippet',
+        maxResults=1,
+        q=' '.join([t.strip().lower(), a.strip().lower()]), 
+        type='video')
+      if len(sres['items']) < 1:
+        view_ct.append(-1)
+        like_ct.append(-1)
+        dislike_ct.append(-1)
+        comment_ct.append(-1)
+      else:
+        vid = sres['items'][0]['id']['videoId']
+        del sres
+
+        vres = videos_list_by_id(client,
+          part='statistics',
+          id=vid)
+        st = vres['items'][0]['statistics']
+
+        if 'viewCount' in st: 
+          view_ct.append(st['viewCount'])
+        else:
+          view_ct.append(-1)
+
+        if 'likeCount' in st:
+          like_ct.append(st['likeCount'])
+        else:
+          like_ct.append(-1)
+        
+        if 'dislikeCount' in st:
+          dislike_ct.append(st['dislikeCount'])
+        else:
+          dislike_ct.append(-1)
+        
+        if 'commentCount' in st:
+          comment_ct.append(st['commentCount'])
+        else:
+          comment_ct.append(-1)
+    return (view_ct, like_ct, dislike_ct, comment_ct)
+  except Exception as e:
+    print (e)
+    exit()
+  
+  # counter += 1
+  # # print (counter)
+  # if counter % 1000 == 0:
+  #   d = make_data_dict(counter, last_counter, 
+  #     titles, artists, view_ct, like_ct, dislike_ct, comment_ct)
+  #   # print (d)
+  #   store_checkpoint(d, checkpoint_counter + counter, max_counter)
+  #   last_counter = counter
+      
+
+
 if __name__ == '__main__':
   # When running locally, disable OAuthlib's HTTPs verification. When
   # running in production *do not* leave this option enabled.
@@ -155,64 +218,48 @@ if __name__ == '__main__':
   last_counter = 0
   max_counter = len(titles)
   counter = 0
+
+  BLK = 1000
+  STEP = BLK//8
+  st_time = time.time()
   try:
-    for t, a in zip(titles, artists):
-      sres = search_list_by_keyword(client,
-        part='snippet',
-        maxResults=1,
-        q=' '.join([t.strip().lower(), a.strip().lower()]), 
-        type='video')
-      if len(sres['items']) < 1:
-        view_ct.append(-1)
-        like_ct.append(-1)
-        dislike_ct.append(-1)
-        comment_ct.append(-1)
-      else:
-        vid = sres['items'][0]['id']['videoId']
-        del sres
+    while last_counter < max_counter:
+      target = last_counter + BLK
+      result = []
+      pool = multiprocessing.Pool(processes = 8)
+      for i in range(last_counter, target, STEP):
+          result.append(pool.apply_async(naive_get_youtube_count, (client, titles[i:i+STEP], artists[i:i+STEP])))
+      pool.close()
+      pool.join()
 
-        vres = videos_list_by_id(client,
-          part='statistics',
-          id=vid)
-        st = vres['items'][0]['statistics']
-        view_ct.append(st['viewCount'])
-
-        if 'likeCount' in st:
-          like_ct.append(st['likeCount'])
-        else:
-          like_ct.append(-1)
-        
-        if 'dislikeCount' in st:
-          dislike_ct.append(st['dislikeCount'])
-        else:
-          dislike_ct.append(-1)
-        
-        if 'commentCount' in st:
-          comment_ct.append(st['commentCount'])
-        else:
-          comment_ct.append(-1)
-      
-      counter += 1
-      # print (counter)
-      if counter % 1000 == 0:
-        d = make_data_dict(counter, last_counter, 
-          titles, artists, view_ct, like_ct, dislike_ct, comment_ct)
-        # print (d)
-        store_checkpoint(d, checkpoint_counter + counter, max_counter)
-        last_counter = counter
-        view_ct = []
-        like_ct = []
-        dislike_ct = []
-        comment_ct = []
+      for i in result:
+        r = i.get()
+        # print (r)
+        view_ct.extend(r[0])
+        like_ct.extend(r[1])
+        dislike_ct.extend(r[2])
+        comment_ct.extend(r[3])
+      # print (target, last_counter, len(titles), len(view_ct))
+      d = make_data_dict(target, last_counter, 
+        titles, artists, view_ct, like_ct, dislike_ct, comment_ct)
+      store_checkpoint(d, checkpoint_counter + target, max_counter)
+      print ('Time Elapsed: {:.2f}s'.format(time.time() - st_time))
+      last_counter  = target
+      view_ct = []
+      like_ct = []
+      dislike_ct = []
+      comment_ct = []
 
   except Exception as e:
     print (e)
-    l = len(view_ct)
-    d = make_data_dict(counter, last_counter, 
-      titles, artists, view_ct, like_ct, dislike_ct, comment_ct)
-    store_checkpoint(d, checkpoint_counter + counter, max_counter)
-    last_counter = counter
-    view_ct = []
-    like_ct = []
-    dislike_ct = []
-    comment_ct = []
+    exit()
+  #   print (e)
+  #   l = len(view_ct)
+  #   d = make_data_dict(counter, last_counter, 
+  #     titles, artists, view_ct, like_ct, dislike_ct, comment_ct)
+  #   store_checkpoint(d, checkpoint_counter + counter, max_counter)
+  #   last_counter = counter
+  #   view_ct = []
+  #   like_ct = []
+  #   dislike_ct = []
+  #   comment_ct = []
